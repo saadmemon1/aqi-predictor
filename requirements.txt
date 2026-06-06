@@ -1,7 +1,7 @@
 fastapi==0.111.0
 uvicorn==0.30.1
 streamlit==1.36.0
-hopsworks==3.7.0
+hopsworks>=4.0.0
 confluent-kafka==2.3.0
 scikit-learn==1.5.0
 xgboost==2.0.3
