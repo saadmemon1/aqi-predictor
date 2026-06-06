@@ -146,6 +146,13 @@ def predict_aqi():
         batch_data.sort_values(by="timestamp", ascending=False, inplace=True)
         latest_features = batch_data.head(1).drop(['date', 'timestamp', 'target_aqi_24h', 'target_aqi_48h'], axis=1, errors='ignore')
         
+        # Align column order with the training features expected by the model
+        if hasattr(model, "feature_names_in_"):
+            latest_features = latest_features[list(model.feature_names_in_)]
+        
+        features_dict = latest_features.to_dict(orient="records")[0]
+        print(f"API Debug - Features passed to model: {features_dict}")
+        
         # Predict and clip to non-negative values (AQI is non-negative)
         prediction = max(0.0, float(model.predict(latest_features)[0]))
         

@@ -87,15 +87,32 @@ st.markdown("<p style='text-align: center; font-size: 1.2em; color: #b0bec5; mar
 # Fetch prediction from FastAPI backend
 @st.cache_data(ttl=300) # Cache for 5 minutes when successful
 def fetch_prediction():
-    response = requests.get("http://127.0.0.1:8000/predict")
-    if response.status_code == 200:
-        return response.json()
-    else:
+    import time
+    max_retries = 5
+    delay = 2.0
+    last_ex = None
+    for attempt in range(1, max_retries + 1):
         try:
-            detail = response.json().get("detail", response.text)
-        except Exception:
-            detail = response.text
-        raise Exception(f"Backend Error ({response.status_code}): {detail}")
+            response = requests.get("http://127.0.0.1:8000/predict", timeout=10)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                try:
+                    detail = response.json().get("detail", response.text)
+                except Exception:
+                    detail = response.text
+                last_ex = Exception(f"Backend Error ({response.status_code}): {detail}")
+                # If it's a 503 error, the backend is still loading, we should wait and retry
+                if response.status_code == 503 and attempt < max_retries:
+                    time.sleep(delay)
+                    continue
+                raise last_ex
+        except Exception as e:
+            last_ex = e
+            if attempt < max_retries:
+                time.sleep(delay)
+            else:
+                raise last_ex
 
 with st.spinner("Fetching latest real-time predictions..."):
     try:
