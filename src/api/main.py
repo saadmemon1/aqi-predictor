@@ -98,3 +98,21 @@ def predict_aqi():
 @app.get("/")
 def health_check():
     return {"status": "healthy"}
+
+@app.get("/test-dns")
+def test_dns():
+    import socket
+    import urllib.request
+    results = {}
+    for host in ["google.com", "api.open-meteo.com", "c.app.hopsworks.ai", "huggingface.co"]:
+        try:
+            ip = socket.gethostbyname(host)
+            results[host] = {"ip": ip, "status": "resolved"}
+            try:
+                urllib.request.urlopen(f"https://{host}", timeout=5)
+                results[host]["http"] = "success"
+            except Exception as e:
+                results[host]["http"] = f"failed: {str(e)}"
+        except Exception as e:
+            results[host] = {"status": f"failed: {str(e)}"}
+    return results

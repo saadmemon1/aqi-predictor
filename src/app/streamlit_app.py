@@ -144,3 +144,15 @@ if data:
 else:
     st.error(f"Failed to fetch predictions. Details: {error_message}")
     st.info("💡 Please verify that: \n1. Your `HOPSWORKS_API_KEY` is added to the Space secrets (Settings -> Variables and Secrets).\n2. The Space is fully built and started.")
+    
+    st.markdown("### 🛠️ Network Connectivity Diagnostics")
+    if st.button("Run Connection Diagnostics"):
+        with st.spinner("Testing DNS resolution and outbound HTTP access..."):
+            try:
+                diag_response = requests.get("http://127.0.0.1:8000/test-dns")
+                if diag_response.status_code == 200:
+                    st.json(diag_response.json())
+                else:
+                    st.error(f"Failed to get diagnostics from backend (HTTP {diag_response.status_code}): {diag_response.text}")
+            except Exception as e:
+                st.error(f"Could not connect to backend diagnostics endpoint: {str(e)}")
