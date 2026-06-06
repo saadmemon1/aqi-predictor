@@ -155,29 +155,53 @@ with st.spinner("Fetching latest real-time predictions..."):
         error_message = str(e)
 
 if data:
-    pred_aqi = max(0.0, data['predicted_aqi_72h'])
+    pred_aqi_24h = max(0.0, data.get('predicted_aqi_24h', 0.0))
+    pred_aqi_48h = max(0.0, data.get('predicted_aqi_48h', 0.0))
+    pred_aqi_72h = max(0.0, data.get('predicted_aqi_72h', 0.0))
     features = data['features_used']
     last_updated = datetime.fromtimestamp(data['latest_timestamp'] / 1000.0).strftime('%Y-%m-%d %H:%M')
     
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        # Determine color and alert HTML based on severity
-        if pred_aqi > 150:
-            aqi_color = "#ff3232" # Red
-            alert_html = "<div class='alert-danger'>⚠️ HAZARDOUS ALERT: AQI is predicted to be very poor!</div>"
-        elif pred_aqi > 100:
-            aqi_color = "#ffa500" # Orange
-            alert_html = "<div class='alert-warning'>🚧 WARNING: AQI is predicted to be poor. Sensitive groups should be careful.</div>"
+    # Helper to get card color and message based on AQI value
+    def get_aqi_status(aqi):
+        if aqi > 150:
+            return "#ff3232", "<div class='alert-danger'>⚠️ HAZARDOUS</div>"
+        elif aqi > 100:
+            return "#ffa500", "<div class='alert-warning'>🚧 WARNING</div>"
         else:
-            aqi_color = "#00E676" # Green
-            alert_html = "<div class='alert-success'>✅ GOOD: Air quality is predicted to be acceptable.</div>"
+            return "#00E676", "<div class='alert-success'>✅ GOOD</div>"
 
+    color_24h, alert_24h = get_aqi_status(pred_aqi_24h)
+    color_48h, alert_48h = get_aqi_status(pred_aqi_48h)
+    color_72h, alert_72h = get_aqi_status(pred_aqi_72h)
+
+    st.markdown("<h3 style='text-align: center; color: white; margin-bottom: 20px;'>3-Day Air Quality Forecast</h3>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
         st.markdown(f"""
         <div class='metric-card' style='text-align: center; margin-bottom: 20px;'>
-            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>Predicted AQI (in 72 hours)</div>
-            <div style='font-size: 3.5rem; font-weight: 800; color: {aqi_color}; margin-bottom: 15px;'>{pred_aqi:.0f}</div>
-            {alert_html}
+            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>Day 1: Tomorrow (24h)</div>
+            <div style='font-size: 3.5rem; font-weight: 800; color: {color_24h}; margin-bottom: 15px;'>{pred_aqi_24h:.0f}</div>
+            {alert_24h}
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class='metric-card' style='text-align: center; margin-bottom: 20px;'>
+            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>Day 2: Day After (48h)</div>
+            <div style='font-size: 3.5rem; font-weight: 800; color: {color_48h}; margin-bottom: 15px;'>{pred_aqi_48h:.0f}</div>
+            {alert_48h}
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class='metric-card' style='text-align: center; margin-bottom: 20px;'>
+            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>Day 3: Three Days (72h)</div>
+            <div style='font-size: 3.5rem; font-weight: 800; color: {color_72h}; margin-bottom: 15px;'>{pred_aqi_72h:.0f}</div>
+            {alert_72h}
         </div>
         """, unsafe_allow_html=True)
         

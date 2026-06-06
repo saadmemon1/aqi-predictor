@@ -91,8 +91,8 @@ def load_model(retries=5, delay=3):
             fs = project.get_feature_store()
             mr = project.get_model_registry()
             
-            print("Downloading model from Hopsworks...")
-            aqi_model = mr.get_model("aqi_prediction_model", version=1)
+            print("Downloading latest model from Hopsworks...")
+            aqi_model = mr.get_model("aqi_prediction_model")
             model_dir = aqi_model.download()
             
             model = joblib.load(os.path.join(model_dir, "aqi_model.pkl"))
@@ -144,7 +144,7 @@ def predict_aqi():
         # We can fetch the batch data and get the latest
         batch_data = feature_view.get_batch_data()
         batch_data.sort_values(by="timestamp", ascending=False, inplace=True)
-        latest_features = batch_data.head(1).drop(['date', 'timestamp', 'target_aqi_24h', 'target_aqi_48h'], axis=1, errors='ignore')
+        latest_features = batch_data.head(1).drop(['date', 'timestamp', 'target_aqi_24h', 'target_aqi_48h', 'target_aqi_72h'], axis=1, errors='ignore')
         
         # Align column order with the training features expected by the model
         if hasattr(model, "feature_names_in_"):
@@ -153,9 +153,21 @@ def predict_aqi():
         features_dict = latest_features.to_dict(orient="records")[0]
         print(f"API Debug - Features passed to model: {features_dict}")
         
-        # Predict and clip to non-negative values (AQI is non-negative)
-        prediction = max(0.0, float(model.predict(latest_features)[0]))
+        # Predict raw values
+        raw_pred = model.predict(latest_features)[0]
         
+        # Check if raw_pred is a multi-output array/list
+        if hasattr(raw_pred, "__len__") and len(raw_pred) >= 3:
+            pred_24h = max(0.0, float(raw_pred[0]))
+            pred_48h = max(0.0, float(raw_pred[1]))
+            pred_72h = max(0.0, float(raw_pred[2]))
+        else:
+            # Fallback for single-output model
+            single_val = max(0.0, float(raw_pred))
+            pred_24h = single_val
+            pred_48h = single_val
+            pred_72h = single_val
+            
         # Calculate SHAP values for feature contribution explanation
         shap_contrib = {}
         try:
@@ -171,7 +183,9 @@ def predict_aqi():
             print(f"Error generating SHAP explanation: {shap_err}")
         
         return {
-            "predicted_aqi_72h": float(prediction),
+            "predicted_aqi_24h": pred_24h,
+            "predicted_aqi_48h": pred_48h,
+            "predicted_aqi_72h": pred_72h,
             "latest_timestamp": float(batch_data.iloc[0]['timestamp']),
             "features_used": latest_features.to_dict(orient="records")[0],
             "shap_explanation": shap_contrib
