@@ -91,8 +91,8 @@ def load_model(retries=5, delay=3):
             fs = project.get_feature_store()
             mr = project.get_model_registry()
             
-            print("Downloading latest model from Hopsworks...")
-            aqi_model = mr.get_model("aqi_prediction_model")
+            print("Downloading best model from Hopsworks...")
+            aqi_model = mr.get_best_model("aqi_prediction_model", "R2", "max")
             model_dir = aqi_model.download()
             
             model = joblib.load(os.path.join(model_dir, "aqi_model.pkl"))
