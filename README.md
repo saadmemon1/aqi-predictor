@@ -1,3 +1,11 @@
+---
+title: AQI Predictor
+emoji: 🌬️
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
 # Serverless AQI Predictor
 
 A 100% serverless machine learning system that predicts Air Quality Index (AQI) 72 hours ahead for Karachi.
