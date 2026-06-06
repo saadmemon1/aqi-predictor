@@ -156,10 +156,25 @@ def predict_aqi():
         # Predict and clip to non-negative values (AQI is non-negative)
         prediction = max(0.0, float(model.predict(latest_features)[0]))
         
+        # Calculate SHAP values for feature contribution explanation
+        shap_contrib = {}
+        try:
+            if explainer is not None:
+                sv = explainer.shap_values(latest_features)
+                if isinstance(sv, list):
+                    sv = sv[0]
+                if len(sv.shape) == 2:
+                    sv = sv[0]
+                for col, val in zip(latest_features.columns, sv):
+                    shap_contrib[col] = float(val)
+        except Exception as shap_err:
+            print(f"Error generating SHAP explanation: {shap_err}")
+        
         return {
             "predicted_aqi_72h": float(prediction),
             "latest_timestamp": float(batch_data.iloc[0]['timestamp']),
-            "features_used": latest_features.to_dict(orient="records")[0]
+            "features_used": latest_features.to_dict(orient="records")[0],
+            "shap_explanation": shap_contrib
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

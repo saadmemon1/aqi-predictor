@@ -151,6 +151,46 @@ if data:
         
     st.markdown("---")
     
+    # Advanced Model Explanation (SHAP)
+    with st.expander("🛠️ Advanced Model Explanation (SHAP)"):
+        st.markdown("""
+        This section explains **why** the machine learning model arrived at this prediction using **SHAP (SHapley Additive exPlanations)**.
+        - **Positive values** push the predicted AQI **up** (predicting worse air quality).
+        - **Negative values** pull the predicted AQI **down** (predicting cleaner air quality).
+        """)
+        
+        shap_data = data.get("shap_explanation", {})
+        if shap_data:
+            # Create a dataframe for the SHAP values
+            shap_df = pd.DataFrame({
+                "Factor": list(shap_data.keys()),
+                "Influence on AQI": list(shap_data.values())
+            })
+            
+            # Sort by absolute influence to show the most important drivers
+            shap_df["Magnitude"] = shap_df["Influence on AQI"].abs()
+            shap_df = shap_df.sort_values(by="Magnitude", ascending=False).drop("Magnitude", axis=1)
+            
+            # Clean up feature names
+            shap_df["Factor"] = shap_df["Factor"].str.replace("_", " ").str.title()
+            
+            # Render horizontal bar chart
+            st.bar_chart(
+                shap_df,
+                x="Factor",
+                y="Influence on AQI",
+                use_container_width=True
+            )
+            
+            # Show DataFrame
+            st.dataframe(
+                shap_df.rename(columns={"Influence on AQI": "Influence on AQI (SHAP value)"}),
+                hide_index=True,
+                use_container_width=True
+            )
+        else:
+            st.info("SHAP explanations are loading or not available for this registered model version.")
+    
     st.markdown("### 🔍 Current Environmental Factors")
     
     # Display features used for prediction
