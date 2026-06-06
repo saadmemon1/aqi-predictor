@@ -137,7 +137,7 @@ def predict_aqi():
         
     try:
         # Get latest features
-        feature_view = fs.get_feature_view("aqi_features_view", version=1)
+        feature_view = fs.get_feature_view("aqi_features_view", version=2)
         # Fetch the last row
         # In Hopsworks, getting a single feature vector:
         # We can use get_feature_vector(entry) if we know the primary key, but since we want the latest:
