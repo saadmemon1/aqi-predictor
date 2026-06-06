@@ -3,6 +3,38 @@ import requests
 import pandas as pd
 from datetime import datetime
 
+def calculate_pm25_aqi(c):
+    if c <= 12.0:
+        return ((50 - 0) / (12.0 - 0)) * (c - 0) + 0
+    elif c <= 35.4:
+        return ((100 - 51) / (35.4 - 12.1)) * (c - 12.1) + 51
+    elif c <= 55.4:
+        return ((150 - 101) / (55.4 - 35.5)) * (c - 35.5) + 101
+    elif c <= 150.4:
+        return ((200 - 151) / (150.4 - 55.5)) * (c - 55.5) + 151
+    elif c <= 250.4:
+        return ((300 - 201) / (250.4 - 150.5)) * (c - 150.5) + 201
+    elif c <= 350.4:
+        return ((400 - 301) / (350.4 - 250.5)) * (c - 250.5) + 301
+    else:
+        return ((500 - 401) / (500.4 - 350.5)) * (c - 350.5) + 401
+
+def calculate_pm10_aqi(c):
+    if c <= 54.0:
+        return ((50 - 0) / (54.0 - 0)) * (c - 0) + 0
+    elif c <= 154.0:
+        return ((100 - 51) / (154.0 - 55.0)) * (c - 55.0) + 51
+    elif c <= 254.0:
+        return ((150 - 101) / (254.0 - 155.0)) * (c - 155.0) + 101
+    elif c <= 354.0:
+        return ((200 - 151) / (354.0 - 255.0)) * (c - 255.0) + 151
+    elif c <= 424.0:
+        return ((300 - 201) / (424.0 - 355.0)) * (c - 355.0) + 201
+    elif c <= 504.0:
+        return ((400 - 301) / (504.0 - 425.0)) * (c - 425.0) + 301
+    else:
+        return ((500 - 401) / (604.0 - 505.0)) * (c - 505.0) + 401
+
 # Configure page
 st.set_page_config(page_title="Karachi AQI Predictor", page_icon="🌬️", layout="wide")
 
@@ -188,6 +220,40 @@ if data:
                 hide_index=True,
                 use_container_width=True
             )
+            
+            # Sub-index EPA AQI calculations
+            st.markdown("---")
+            st.markdown("### 📊 Current AQI Calculation Math (US EPA)")
+            st.markdown("The current AQI is determined by calculating the individual sub-indices for PM2.5 and PM10. The overall current AQI is the **maximum** of these sub-indices:")
+            
+            pm25_val = features.get('pm2_5', 0.0)
+            pm10_val = features.get('pm10', 0.0)
+            
+            pm25_aqi = calculate_pm25_aqi(pm25_val)
+            pm10_aqi = calculate_pm10_aqi(pm10_val)
+            overall_current_aqi = max(pm25_aqi, pm10_aqi)
+            
+            cc1, cc2, cc3 = st.columns(3)
+            with cc1:
+                st.metric(
+                    label="PM2.5 Sub-Index", 
+                    value=f"{pm25_aqi:.0f}", 
+                    help=f"Calculated from current PM2.5 concentration of {pm25_val:.1f} μg/m³"
+                )
+            with cc2:
+                st.metric(
+                    label="PM10 Sub-Index", 
+                    value=f"{pm10_aqi:.0f}", 
+                    help=f"Calculated from current PM10 concentration of {pm10_val:.1f} μg/m³"
+                )
+            with cc3:
+                st.metric(
+                    label="Current Overall AQI", 
+                    value=f"{overall_current_aqi:.0f}", 
+                    help="Maximum of the individual pollutant sub-indices"
+                )
+                
+            st.latex(r"\text{Overall AQI} = \max(\text{AQI}_{\text{PM2.5}}, \text{AQI}_{\text{PM10}}) = \max(" + f"{pm25_aqi:.0f}, {pm10_aqi:.0f}" + r") = " + f"{overall_current_aqi:.0f}")
         else:
             st.info("SHAP explanations are loading or not available for this registered model version.")
     
