@@ -106,25 +106,31 @@ with st.spinner("Fetching latest real-time predictions..."):
         error_message = str(e)
 
 if data:
-    pred_aqi = data['predicted_aqi_72h']
+    pred_aqi = max(0.0, data['predicted_aqi_72h'])
     features = data['features_used']
     last_updated = datetime.fromtimestamp(data['latest_timestamp'] / 1000.0).strftime('%Y-%m-%d %H:%M')
     
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-        st.metric(label="Predicted AQI (in 72 hours)", value=f"{pred_aqi:.0f}")
-        
-        # Alerts
+        # Determine color and alert HTML based on severity
         if pred_aqi > 150:
-            st.markdown("<div class='alert-danger'>⚠️ HAZARDOUS ALERT: AQI is predicted to be very poor!</div>", unsafe_allow_html=True)
+            aqi_color = "#ff3232" # Red
+            alert_html = "<div class='alert-danger'>⚠️ HAZARDOUS ALERT: AQI is predicted to be very poor!</div>"
         elif pred_aqi > 100:
-            st.markdown("<div class='alert-warning'>🚧 WARNING: AQI is predicted to be poor. Sensitive groups should be careful.</div>", unsafe_allow_html=True)
+            aqi_color = "#ffa500" # Orange
+            alert_html = "<div class='alert-warning'>🚧 WARNING: AQI is predicted to be poor. Sensitive groups should be careful.</div>"
         else:
-            st.markdown("<div class='alert-success'>✅ GOOD: Air quality is predicted to be acceptable.</div>", unsafe_allow_html=True)
-            
-        st.markdown("</div>", unsafe_allow_html=True)
+            aqi_color = "#00E676" # Green
+            alert_html = "<div class='alert-success'>✅ GOOD: Air quality is predicted to be acceptable.</div>"
+
+        st.markdown(f"""
+        <div class='metric-card' style='text-align: center; margin-bottom: 20px;'>
+            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>Predicted AQI (in 72 hours)</div>
+            <div style='font-size: 3.5rem; font-weight: 800; color: {aqi_color}; margin-bottom: 15px;'>{pred_aqi:.0f}</div>
+            {alert_html}
+        </div>
+        """, unsafe_allow_html=True)
         
     st.markdown("---")
     

@@ -146,8 +146,8 @@ def predict_aqi():
         batch_data.sort_values(by="timestamp", ascending=False, inplace=True)
         latest_features = batch_data.head(1).drop(['date', 'timestamp', 'target_aqi_24h', 'target_aqi_48h'], axis=1, errors='ignore')
         
-        # Predict
-        prediction = model.predict(latest_features)[0]
+        # Predict and clip to non-negative values (AQI is non-negative)
+        prediction = max(0.0, float(model.predict(latest_features)[0]))
         
         return {
             "predicted_aqi_72h": float(prediction),
