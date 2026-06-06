@@ -40,7 +40,7 @@ code_cells = [
     (
         "markdown",
         "# 2. Fetch Historical Data from OpenMeteo\n"
-        "We fetch historical weather and air quality data for Karachi (24.8607, 67.0011) from 2020 to present."
+        "We fetch historical weather and air quality data for Karachi (24.832862, 67.033866) from 2020 to present."
     ),
     (
         "code",
@@ -105,7 +105,7 @@ code_cells = [
         "    df = pd.merge(df_weather, df_aqi, on='date', how='inner')\n"
         "    df.dropna(inplace=True)\n"
         "    return df\n\n"
-        "karachi_lat, karachi_lon = 24.8607, 67.0011\n"
+        "karachi_lat, karachi_lon = 24.832862, 67.033866\n"
         "end_date = datetime.now().strftime('%Y-%m-%d')\n"
         "df = fetch_openmeteo_historical(karachi_lat, karachi_lon, '2023-01-01', end_date)\n"
         "df.head()"

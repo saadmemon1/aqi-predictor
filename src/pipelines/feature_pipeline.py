@@ -19,7 +19,7 @@ def run_feature_pipeline():
     fs = project.get_feature_store()
 
     # Define coordinates
-    lat, lon = 24.8607, 67.0011
+    lat, lon = 24.832862, 67.033866
     
     # We fetch the last 3 days to correctly compute 24h rolling features
     end_date = datetime.now().strftime('%Y-%m-%d')
