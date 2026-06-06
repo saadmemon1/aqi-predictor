@@ -85,23 +85,25 @@ st.markdown("<h1 style='text-align: center; font-size: 4em; margin-bottom: 0px;'
 st.markdown("<p style='text-align: center; font-size: 1.2em; color: #b0bec5; margin-bottom: 40px;'>Predicting Air Quality 72 Hours Ahead using Serverless Machine Learning</p>", unsafe_allow_html=True)
 
 # Fetch prediction from FastAPI backend
-@st.cache_data(ttl=60) # Cache for 1 minute while debugging/starting up
+@st.cache_data(ttl=300) # Cache for 5 minutes when successful
 def fetch_prediction():
-    try:
-        response = requests.get("http://127.0.0.1:8000/predict")
-        if response.status_code == 200:
-            return response.json(), None
-        else:
-            try:
-                detail = response.json().get("detail", response.text)
-            except Exception:
-                detail = response.text
-            return None, f"Backend Error ({response.status_code}): {detail}"
-    except Exception as e:
-        return None, f"Failed to connect to backend: {str(e)}"
+    response = requests.get("http://127.0.0.1:8000/predict")
+    if response.status_code == 200:
+        return response.json()
+    else:
+        try:
+            detail = response.json().get("detail", response.text)
+        except Exception:
+            detail = response.text
+        raise Exception(f"Backend Error ({response.status_code}): {detail}")
 
 with st.spinner("Fetching latest real-time predictions..."):
-    data, error_message = fetch_prediction()
+    try:
+        data = fetch_prediction()
+        error_message = None
+    except Exception as e:
+        data = None
+        error_message = str(e)
 
 if data:
     pred_aqi = data['predicted_aqi_72h']
