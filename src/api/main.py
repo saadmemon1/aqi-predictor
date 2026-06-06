@@ -58,14 +58,15 @@ def resolve_via_doh(domain):
     return None
 
 def ensure_hopsworks_resolved():
-    if "c.app.hopsworks.ai" not in custom_dns_map:
-        print("Bypassing DNS for Hopsworks: Querying DoH endpoints...")
-        ip = resolve_via_doh("c.app.hopsworks.ai")
-        if ip:
-            custom_dns_map["c.app.hopsworks.ai"] = ip
-            print(f"Bypassed DNS resolution: c.app.hopsworks.ai -> {ip}")
-        else:
-            print("Warning: Could not resolve c.app.hopsworks.ai via DoH.")
+    for host in ["eu-west.cloud.hopsworks.ai", "c.app.hopsworks.ai"]:
+        if host not in custom_dns_map:
+            print(f"Bypassing DNS for {host}: Querying DoH endpoints...")
+            ip = resolve_via_doh(host)
+            if ip:
+                custom_dns_map[host] = ip
+                print(f"Bypassed DNS resolution: {host} -> {ip}")
+            else:
+                print(f"Warning: Could not resolve {host} via DoH.")
 
 app = FastAPI(title="AQI Predictor API")
 
@@ -86,7 +87,7 @@ def load_model(retries=5, delay=3):
     for attempt in range(1, retries + 1):
         try:
             print(f"Attempting to login to Hopsworks (attempt {attempt}/{retries})...")
-            project = hopsworks.login(api_key_value=api_key)
+            project = hopsworks.login(host="eu-west.cloud.hopsworks.ai", api_key_value=api_key)
             fs = project.get_feature_store()
             mr = project.get_model_registry()
             
@@ -166,9 +167,10 @@ def test_dns():
     import urllib.request
     results = {
         "custom_dns_map": custom_dns_map,
-        "doh_lookup_c_app_hopsworks_ai": resolve_via_doh("c.app.hopsworks.ai")
+        "doh_lookup_c_app_hopsworks_ai": resolve_via_doh("c.app.hopsworks.ai"),
+        "doh_lookup_eu_west_cloud_hopsworks_ai": resolve_via_doh("eu-west.cloud.hopsworks.ai")
     }
-    for host in ["google.com", "api.open-meteo.com", "c.app.hopsworks.ai", "huggingface.co"]:
+    for host in ["google.com", "api.open-meteo.com", "c.app.hopsworks.ai", "eu-west.cloud.hopsworks.ai", "huggingface.co"]:
         try:
             ip = socket.gethostbyname(host)
             results[host] = {"ip": ip, "status": "resolved"}

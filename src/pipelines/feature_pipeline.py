@@ -15,7 +15,7 @@ def run_feature_pipeline():
         print("HOPSWORKS_API_KEY not found in environment.")
         return False
         
-    project = hopsworks.login(api_key_value=api_key)
+    project = hopsworks.login(host="eu-west.cloud.hopsworks.ai", api_key_value=api_key)
     fs = project.get_feature_store()
 
     # Define coordinates
