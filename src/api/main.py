@@ -6,36 +6,50 @@ from pydantic import BaseModel
 import pandas as pd
 from src.pipelines.feature_pipeline import run_feature_pipeline
 
+import time
+
 app = FastAPI(title="AQI Predictor API")
 
 model = None
 explainer = None
 fs = None
+last_load_error = None
 
-# We can load the model lazily or on startup. Since Hugging Face Spaces provides 16GB RAM,
-# we can safely load it on startup.
-@app.on_event("startup")
-def load_model():
-    global model, explainer, fs
+def load_model(retries=5, delay=3):
+    global model, explainer, fs, last_load_error
     api_key = os.getenv("HOPSWORKS_API_KEY")
     if not api_key:
-        print("Warning: HOPSWORKS_API_KEY not found. Model will not be loaded.")
-        return
+        last_load_error = "HOPSWORKS_API_KEY environment variable not found."
+        print(f"Warning: {last_load_error}")
+        return False
         
-    try:
-        project = hopsworks.login(api_key_value=api_key)
-        fs = project.get_feature_store()
-        mr = project.get_model_registry()
-        
-        print("Downloading model from Hopsworks...")
-        aqi_model = mr.get_model("aqi_prediction_model", version=1)
-        model_dir = aqi_model.download()
-        
-        model = joblib.load(os.path.join(model_dir, "aqi_model.pkl"))
-        explainer = joblib.load(os.path.join(model_dir, "shap_explainer.pkl"))
-        print("Model loaded successfully.")
-    except Exception as e:
-        print(f"Error loading model: {e}")
+    for attempt in range(1, retries + 1):
+        try:
+            print(f"Attempting to login to Hopsworks (attempt {attempt}/{retries})...")
+            project = hopsworks.login(api_key_value=api_key)
+            fs = project.get_feature_store()
+            mr = project.get_model_registry()
+            
+            print("Downloading model from Hopsworks...")
+            aqi_model = mr.get_model("aqi_prediction_model", version=1)
+            model_dir = aqi_model.download()
+            
+            model = joblib.load(os.path.join(model_dir, "aqi_model.pkl"))
+            explainer = joblib.load(os.path.join(model_dir, "shap_explainer.pkl"))
+            print("Model loaded successfully.")
+            last_load_error = None
+            return True
+        except Exception as e:
+            last_load_error = f"Attempt {attempt} failed: {str(e)}"
+            print(f"Error loading model on attempt {attempt}: {e}")
+            if attempt < retries:
+                time.sleep(delay)
+    return False
+
+@app.on_event("startup")
+def startup_load_model():
+    # Attempt to load model on startup in the background or synchronously
+    load_model(retries=3, delay=5)
 
 @app.post("/run-feature-pipeline")
 def api_run_feature_pipeline():
@@ -49,8 +63,15 @@ def api_run_feature_pipeline():
 @app.get("/predict")
 def predict_aqi():
     """Fetches latest features from Hopsworks and returns 72h AQI prediction."""
+    global model, fs, last_load_error
     if model is None or fs is None:
-        raise HTTPException(status_code=503, detail="Model or Feature Store not loaded")
+        load_model(retries=1, delay=0)
+        
+    if model is None or fs is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Model or Feature Store not loaded. Last error: {last_load_error}"
+        )
         
     try:
         # Get latest features
