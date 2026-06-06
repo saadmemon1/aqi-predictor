@@ -6,67 +6,6 @@ from pydantic import BaseModel
 import pandas as pd
 from src.pipelines.feature_pipeline import run_feature_pipeline
 import time
-import socket
-import urllib.request
-import json
-
-# Save the original getaddrinfo
-original_getaddrinfo = socket.getaddrinfo
-
-# Custom DNS resolution mapping
-custom_dns_map = {}
-
-def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-    if host in custom_dns_map:
-        return original_getaddrinfo(custom_dns_map[host], port, family, type, proto, flags)
-    return original_getaddrinfo(host, port, family, type, proto, flags)
-
-# Patch socket.getaddrinfo globally
-socket.getaddrinfo = custom_getaddrinfo
-
-def resolve_via_doh(domain):
-    # Try Cloudflare DoH (DNS-over-HTTPS)
-    try:
-        req = urllib.request.Request(
-            f"https://cloudflare-dns.com/dns-query?name={domain}&type=A",
-            headers={"Accept": "application/dns-json"}
-        )
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode())
-            if "Answer" in data and len(data["Answer"]) > 0:
-                for ans in data["Answer"]:
-                    if ans["type"] == 1:  # A record
-                        return ans["data"]
-    except Exception as e:
-        print(f"Cloudflare DoH failed for {domain}: {e}")
-
-    # Try Google DoH
-    try:
-        req = urllib.request.Request(
-            f"https://dns.google/resolve?name={domain}&type=A",
-            headers={"Accept": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode())
-            if "Answer" in data and len(data["Answer"]) > 0:
-                for ans in data["Answer"]:
-                    if ans["type"] == 1:  # A record
-                        return ans["data"]
-    except Exception as e:
-        print(f"Google DoH failed for {domain}: {e}")
-
-    return None
-
-def ensure_hopsworks_resolved():
-    for host in ["eu-west.cloud.hopsworks.ai", "c.app.hopsworks.ai"]:
-        if host not in custom_dns_map:
-            print(f"Bypassing DNS for {host}: Querying DoH endpoints...")
-            ip = resolve_via_doh(host)
-            if ip:
-                custom_dns_map[host] = ip
-                print(f"Bypassed DNS resolution: {host} -> {ip}")
-            else:
-                print(f"Warning: Could not resolve {host} via DoH.")
 
 app = FastAPI(title="AQI Predictor API")
 
@@ -77,7 +16,6 @@ last_load_error = None
 
 def load_model(retries=5, delay=3):
     global model, explainer, fs, last_load_error
-    ensure_hopsworks_resolved()
     api_key = os.getenv("HOPSWORKS_API_KEY")
     if not api_key:
         last_load_error = "HOPSWORKS_API_KEY environment variable not found."
@@ -115,7 +53,6 @@ def startup_load_model():
 @app.post("/run-feature-pipeline")
 def api_run_feature_pipeline():
     """Triggered hourly by cron-job.org"""
-    ensure_hopsworks_resolved()
     success = run_feature_pipeline()
     if success:
         return {"status": "success", "message": "Feature pipeline executed successfully"}
@@ -196,25 +133,3 @@ def predict_aqi():
 @app.get("/")
 def health_check():
     return {"status": "healthy"}
-
-@app.get("/test-dns")
-def test_dns():
-    import socket
-    import urllib.request
-    results = {
-        "custom_dns_map": custom_dns_map,
-        "doh_lookup_c_app_hopsworks_ai": resolve_via_doh("c.app.hopsworks.ai"),
-        "doh_lookup_eu_west_cloud_hopsworks_ai": resolve_via_doh("eu-west.cloud.hopsworks.ai")
-    }
-    for host in ["google.com", "api.open-meteo.com", "c.app.hopsworks.ai", "eu-west.cloud.hopsworks.ai", "huggingface.co"]:
-        try:
-            ip = socket.gethostbyname(host)
-            results[host] = {"ip": ip, "status": "resolved"}
-            try:
-                urllib.request.urlopen(f"https://{host}", timeout=5)
-                results[host]["http"] = "success"
-            except Exception as e:
-                results[host]["http"] = f"failed: {str(e)}"
-        except Exception as e:
-            results[host] = {"status": f"failed: {str(e)}"}
-    return results
