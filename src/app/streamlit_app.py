@@ -108,7 +108,7 @@ with st.spinner("Fetching latest real-time predictions..."):
 if data:
     pred_aqi = data['predicted_aqi_72h']
     features = data['features_used']
-    last_updated = datetime.fromtimestamp(data['latest_timestamp'] * 3600).strftime('%Y-%m-%d %H:%M') # Rough timestamp conversion
+    last_updated = datetime.fromtimestamp(data['latest_timestamp'] / 1000.0).strftime('%Y-%m-%d %H:%M')
     
     col1, col2, col3 = st.columns([1, 2, 1])
     
