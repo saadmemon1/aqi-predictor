@@ -1,0 +1,143 @@
+import streamlit as st
+import requests
+import pandas as pd
+from datetime import datetime
+
+# Configure page
+st.set_page_config(page_title="Karachi AQI Predictor", page_icon="🌬️", layout="wide")
+
+# Custom CSS for modern aesthetics
+st.markdown("""
+<style>
+    /* Main background */
+    .stApp {
+        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        color: #ffffff;
+    }
+    
+    /* Cards */
+    div[data-testid="stMetricValue"] {
+        font-size: 3rem !important;
+        font-weight: 800;
+        color: #00E676;
+    }
+    
+    .metric-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        transition: transform 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    h1, h2, h3 {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        background: -webkit-linear-gradient(#eee, #333);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: white !important;
+    }
+    
+    /* Text overrides for gradient background */
+    p, span, div {
+        color: #e0e0e0;
+    }
+    
+    .alert-danger {
+        background: rgba(255, 50, 50, 0.2);
+        border-left: 5px solid #ff3232;
+        padding: 15px;
+        border-radius: 5px;
+        color: white;
+        font-weight: bold;
+    }
+    
+    .alert-warning {
+        background: rgba(255, 165, 0, 0.2);
+        border-left: 5px solid #ffa500;
+        padding: 15px;
+        border-radius: 5px;
+        color: white;
+        font-weight: bold;
+    }
+    
+    .alert-success {
+        background: rgba(0, 230, 118, 0.2);
+        border-left: 5px solid #00E676;
+        padding: 15px;
+        border-radius: 5px;
+        color: white;
+        font-weight: bold;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Title
+st.markdown("<h1 style='text-align: center; font-size: 4em; margin-bottom: 0px;'>Karachi AQI Predictor 🌬️</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 1.2em; color: #b0bec5; margin-bottom: 40px;'>Predicting Air Quality 72 Hours Ahead using Serverless Machine Learning</p>", unsafe_allow_html=True)
+
+# Fetch prediction from FastAPI backend
+@st.cache_data(ttl=3600) # Cache for 1 hour
+def fetch_prediction():
+    try:
+        # Assuming FastAPI is running locally on port 8000
+        # In a real deployed Docker container, they share localhost or service names.
+        # Since we start them together, we use 127.0.0.1
+        response = requests.get("http://127.0.0.1:8000/predict")
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception as e:
+        return None
+
+with st.spinner("Fetching latest real-time predictions..."):
+    data = fetch_prediction()
+
+if data:
+    pred_aqi = data['predicted_aqi_72h']
+    features = data['features_used']
+    last_updated = datetime.fromtimestamp(data['latest_timestamp'] * 3600).strftime('%Y-%m-%d %H:%M') # Rough timestamp conversion
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+        st.metric(label="Predicted AQI (in 72 hours)", value=f"{pred_aqi:.0f}")
+        
+        # Alerts
+        if pred_aqi > 150:
+            st.markdown("<div class='alert-danger'>⚠️ HAZARDOUS ALERT: AQI is predicted to be very poor!</div>", unsafe_allow_html=True)
+        elif pred_aqi > 100:
+            st.markdown("<div class='alert-warning'>🚧 WARNING: AQI is predicted to be poor. Sensitive groups should be careful.</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div class='alert-success'>✅ GOOD: Air quality is predicted to be acceptable.</div>", unsafe_allow_html=True)
+            
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+    st.markdown("---")
+    
+    st.markdown("### 🔍 Current Environmental Factors")
+    
+    # Display features used for prediction
+    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+    with mcol1:
+        st.metric("Temperature", f"{features.get('temperature', 0):.1f} °C")
+    with mcol2:
+        st.metric("Humidity", f"{features.get('humidity', 0):.0f} %")
+    with mcol3:
+        st.metric("PM2.5", f"{features.get('pm2_5', 0):.1f} μg/m³")
+    with mcol4:
+        st.metric("PM10", f"{features.get('pm10', 0):.1f} μg/m³")
+        
+    st.markdown("<br><p style='text-align: center; color: #90a4ae;'>Data sourced from OpenMeteo & Hopsworks Feature Store.</p>", unsafe_allow_html=True)
+
+else:
+    st.error("Failed to fetch predictions. The backend model might still be loading or starting up. Please refresh in a minute.")
