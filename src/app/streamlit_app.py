@@ -85,21 +85,23 @@ st.markdown("<h1 style='text-align: center; font-size: 4em; margin-bottom: 0px;'
 st.markdown("<p style='text-align: center; font-size: 1.2em; color: #b0bec5; margin-bottom: 40px;'>Predicting Air Quality 72 Hours Ahead using Serverless Machine Learning</p>", unsafe_allow_html=True)
 
 # Fetch prediction from FastAPI backend
-@st.cache_data(ttl=3600) # Cache for 1 hour
+@st.cache_data(ttl=60) # Cache for 1 minute while debugging/starting up
 def fetch_prediction():
     try:
-        # Assuming FastAPI is running locally on port 8000
-        # In a real deployed Docker container, they share localhost or service names.
-        # Since we start them together, we use 127.0.0.1
         response = requests.get("http://127.0.0.1:8000/predict")
         if response.status_code == 200:
-            return response.json()
-        return None
+            return response.json(), None
+        else:
+            try:
+                detail = response.json().get("detail", response.text)
+            except Exception:
+                detail = response.text
+            return None, f"Backend Error ({response.status_code}): {detail}"
     except Exception as e:
-        return None
+        return None, f"Failed to connect to backend: {str(e)}"
 
 with st.spinner("Fetching latest real-time predictions..."):
-    data = fetch_prediction()
+    data, error_message = fetch_prediction()
 
 if data:
     pred_aqi = data['predicted_aqi_72h']
@@ -140,4 +142,5 @@ if data:
     st.markdown("<br><p style='text-align: center; color: #90a4ae;'>Data sourced from OpenMeteo & Hopsworks Feature Store.</p>", unsafe_allow_html=True)
 
 else:
-    st.error("Failed to fetch predictions. The backend model might still be loading or starting up. Please refresh in a minute.")
+    st.error(f"Failed to fetch predictions. Details: {error_message}")
+    st.info("💡 Please verify that: \n1. Your `HOPSWORKS_API_KEY` is added to the Space secrets (Settings -> Variables and Secrets).\n2. The Space is fully built and started.")
