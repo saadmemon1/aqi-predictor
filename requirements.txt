@@ -9,7 +9,6 @@ shap==0.46.0
 pandas==2.1.4
 numpy==1.26.4
 openmeteo-requests==1.2.0
-requests-cache==1.2.1
 retry-requests==2.0.0
 matplotlib==3.9.0
 seaborn==0.13.2

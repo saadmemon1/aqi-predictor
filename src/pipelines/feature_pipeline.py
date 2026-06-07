@@ -25,8 +25,9 @@ def run_feature_pipeline():
     end_date = datetime.now().strftime('%Y-%m-%d')
     start_date = (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d')
     
-    cache_session = requests_cache.CachedSession('.cache', expire_after=-1)
-    retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
+    import requests
+    session = requests.Session()
+    retry_session = retry(session, retries=5, backoff_factor=0.2)
     openmeteo = openmeteo_requests.Client(session=retry_session)
 
     # 1. Weather Data

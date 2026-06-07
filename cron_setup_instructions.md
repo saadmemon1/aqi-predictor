@@ -18,9 +18,10 @@ For an external service to trigger your GitHub Action, it needs permission.
 4. **Execution schedule**: Set it to run **every hour** (e.g., at minute 0).
 5. Switch to the **Advanced** tab:
    - **HTTP Method**: Change to `POST`.
-   - **Request Headers**: Add two headers:
+   - **Request Headers**: Add three headers:
      1. Key: `Accept`, Value: `application/vnd.github.v3+json`
      2. Key: `Authorization`, Value: `Bearer YOUR_COPIED_TOKEN`
+     3. Key: `Content-Type`, Value: `application/json`
    - **Request Body**: Select `Raw` and paste:
      ```json
      {"event_type": "run-feature-pipeline"}
