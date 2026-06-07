@@ -19,55 +19,44 @@ import warnings
 warnings.filterwarnings('ignore')
 def fix_xgboost_base_score(model):
     """
-    XGBoost 3.0+ multi-output models serialize 'base_score' as a list or list-string.
-    This monkey-patches SHAP's internal UBJSON and JSON decoders to intercept the parsed model configuration
-    and fix the base_score string so SHAP TreeExplainer doesn't crash on float() conversion.
+    XGBoost 3.0+ serializes 'base_score' as a list-string like '[8.8E1,8.8E1,8.8E1]'.
+    SHAP's XGBTreeModelLoader calls float() on this and crashes.
+    
+    Key insight: SHAP's _tree.py does 'from .other._ubjson import decode_ubjson_buffer',
+    which creates a LOCAL reference in the _tree module namespace. We must patch THAT
+    reference (shap_tree.decode_ubjson_buffer), not the source module.
     """
     import shap.explainers._tree as shap_tree
-    
-    # Patch UBJSON decoder (used in newer SHAP versions with XGBoost)
-    try:
-        import shap.explainers.other._ubjson as ubj
-        original_decode = ubj.decode_ubjson_buffer
-        if not hasattr(original_decode, "_patched"):
-            def patched_decode(*args, **kwargs):
-                jmodel = original_decode(*args, **kwargs)
-                if isinstance(jmodel, dict):
-                    base_score = jmodel.get("learner", {}).get("learner_model_param", {}).get("base_score")
-                    if base_score is not None:
-                        if isinstance(base_score, str) and base_score.startswith("["):
-                            inner = base_score.strip("[]").split(",")[0]
-                            jmodel["learner"]["learner_model_param"]["base_score"] = inner
-                        elif isinstance(base_score, list) and len(base_score) > 0:
-                            jmodel["learner"]["learner_model_param"]["base_score"] = str(base_score[0])
-                return jmodel
-            patched_decode._patched = True
-            ubj.decode_ubjson_buffer = patched_decode
-    except Exception:
-        pass
 
-    # Patch json.loads in shap.explainers._tree (used in some SHAP versions)
-    try:
-        original_loads = shap_tree.json.loads
-        if not hasattr(original_loads, "_patched"):
-            def patched_loads(*args, **kwargs):
-                jmodel = original_loads(*args, **kwargs)
-                if isinstance(jmodel, dict):
-                    base_score = jmodel.get("learner", {}).get("learner_model_param", {}).get("base_score")
-                    if base_score is not None:
-                        if isinstance(base_score, str) and base_score.startswith("["):
-                            inner = base_score.strip("[]").split(",")[0]
-                            jmodel["learner"]["learner_model_param"]["base_score"] = inner
-                        elif isinstance(base_score, list) and len(base_score) > 0:
-                            jmodel["learner"]["learner_model_param"]["base_score"] = str(base_score[0])
-                return jmodel
-            patched_loads._patched = True
-            shap_tree.json.loads = patched_loads
-    except Exception:
-        pass
-        
-        
-    print("Successfully monkey-patched SHAP JSON/UBJSON decoders to handle XGBoost base_score.")
+    def _fix_base_score_in_dict(d):
+        """Fix base_score in a parsed XGBoost model dict."""
+        if not isinstance(d, dict):
+            return d
+        try:
+            bs = d.get("learner", {}).get("learner_model_param", {}).get("base_score")
+            if bs is not None:
+                if isinstance(bs, str) and bs.startswith("["):
+                    first_val = bs.strip("[]").split(",")[0].strip()
+                    d["learner"]["learner_model_param"]["base_score"] = first_val
+                    print(f"  [patch] Fixed base_score from list-string to: {first_val}")
+                elif isinstance(bs, list) and len(bs) > 0:
+                    d["learner"]["learner_model_param"]["base_score"] = str(float(bs[0]))
+                    print(f"  [patch] Fixed base_score from list to: {bs[0]}")
+        except Exception as e:
+            print(f"  [patch] Warning during base_score fix: {e}")
+        return d
+
+    # Patch the decode_ubjson_buffer reference IN shap.explainers._tree (not the source module)
+    original_decode = shap_tree.decode_ubjson_buffer
+    if not hasattr(original_decode, "_bs_patched"):
+        def patched_decode(*args, **kwargs):
+            result = original_decode(*args, **kwargs)
+            return _fix_base_score_in_dict(result)
+        patched_decode._bs_patched = True
+        shap_tree.decode_ubjson_buffer = patched_decode
+        print("Patched shap_tree.decode_ubjson_buffer (local ref in _tree.py).")
+
+    print("Successfully monkey-patched SHAP to handle XGBoost 3.0+ base_score.")
 
 
 def run_training_pipeline():
