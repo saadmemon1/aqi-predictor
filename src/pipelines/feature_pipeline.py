@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import hopsworks
 import openmeteo_requests
-import requests_cache
 from retry_requests import retry
 from datetime import datetime, timedelta
 
