@@ -174,7 +174,8 @@ if data:
     color_48h, alert_48h = get_aqi_status(pred_aqi_48h)
     color_72h, alert_72h = get_aqi_status(pred_aqi_72h)
 
-    st.markdown("<h3 style='text-align: center; color: white; margin-bottom: 20px;'>3-Day Air Quality Forecast</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: white; margin-bottom: 5px;'>3-Day Air Quality Forecast</h3>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: center; color: #b0bec5; font-size: 0.9rem; margin-bottom: 20px;'>Data last updated: {last_updated}</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns(3)
     

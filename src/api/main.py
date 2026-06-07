@@ -105,7 +105,9 @@ def predict_aqi():
                 sv = explainer.shap_values(latest_features)
                 if isinstance(sv, list):
                     sv = sv[0]
-                if len(sv.shape) == 2:
+                if len(sv.shape) == 3:
+                    sv = sv[0, :, 0]  # shape: (n_samples, n_features, n_targets) -> take first sample, first target
+                elif len(sv.shape) == 2:
                     sv = sv[0]
                 for col, val in zip(latest_features.columns, sv):
                     shap_contrib[col] = float(val)
