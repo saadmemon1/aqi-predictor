@@ -68,8 +68,9 @@ def predict_aqi():
         # Get latest features from Hopsworks Feature Group
         fg = fs.get_feature_group("aqi_features", version=1)
         
-        # Read all data via Feature Query Service (~30K rows, takes ~1 second)
-        df = fg.read()
+        # Read only the last 48 hours of data (drastically faster than downloading all 30K historical rows)
+        recent_time = int((time.time() - 48 * 3600) * 1000)
+        df = fg.filter(fg.timestamp >= recent_time).read()
         df.sort_values(by="timestamp", ascending=False, inplace=True)
         
         # Ensure we only pass the exactly expected 18 features in the correct order

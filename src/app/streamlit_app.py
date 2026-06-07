@@ -94,7 +94,7 @@ def fetch_prediction():
     last_ex = None
     for attempt in range(1, max_retries + 1):
         try:
-            response = requests.get("http://127.0.0.1:8000/predict", timeout=10)
+            response = requests.get("http://127.0.0.1:8000/predict", timeout=30)
             if response.status_code == 200:
                 return response.json()
             else:
