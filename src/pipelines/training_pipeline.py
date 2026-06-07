@@ -17,6 +17,38 @@ import shap
 import joblib
 import warnings
 warnings.filterwarnings('ignore')
+def fix_xgboost_base_score(model):
+    """
+    XGBoost 3.0+ multi-output models serialize 'base_score' as a list or list-string.
+    This fixes it to a single float representation in the config so SHAP TreeExplainer doesn't crash.
+    """
+    import json
+    try:
+        booster = model.get_booster()
+        config = json.loads(booster.save_config())
+        
+        def fix_dict(d):
+            if not isinstance(d, dict):
+                return
+            for k, v in d.items():
+                if k == "base_score":
+                    if isinstance(v, list) and len(v) > 0:
+                        d[k] = str(float(v[0]))
+                    elif isinstance(v, str) and v.startswith("["):
+                        inner = v.strip("[]").split(",")[0]
+                        d[k] = str(float(inner))
+                elif isinstance(v, dict):
+                    fix_dict(v)
+                elif isinstance(v, list):
+                    for item in v:
+                        if isinstance(item, dict):
+                            fix_dict(item)
+                            
+        fix_dict(config)
+        booster.load_config(json.dumps(config))
+        print("Successfully patched XGBoost base_score inside booster configuration.")
+    except Exception as e:
+        print(f"Warning: Could not patch XGBoost base_score: {e}")
 
 
 def run_training_pipeline():
@@ -134,6 +166,10 @@ def run_training_pipeline():
             best_overall_model_name = name
 
     print(f"\n🏆 Best Overall Model: {best_overall_model_name} with Test R2: {best_overall_r2:.2f}")
+
+    # Patch XGBoost model configuration if it won, to prevent SHAP TreeExplainer crash
+    if best_overall_model_name == "XGBoost":
+        fix_xgboost_base_score(best_overall_model)
 
     print("=" * 60)
     print("STEP 4: Generating SHAP explanations")
