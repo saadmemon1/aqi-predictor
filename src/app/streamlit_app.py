@@ -155,34 +155,51 @@ with st.spinner("Fetching latest real-time predictions..."):
         error_message = str(e)
 
 if data:
+    current_aqi = max(0.0, data.get('current_aqi', 0.0))
     pred_aqi_24h = max(0.0, data.get('predicted_aqi_24h', 0.0))
     pred_aqi_48h = max(0.0, data.get('predicted_aqi_48h', 0.0))
     pred_aqi_72h = max(0.0, data.get('predicted_aqi_72h', 0.0))
     features = data['features_used']
     last_updated = datetime.fromtimestamp(data['latest_timestamp'] / 1000.0).strftime('%Y-%m-%d %H:%M')
     
-    # Helper to get card color and message based on AQI value
+    # US EPA AQI Categories
     def get_aqi_status(aqi):
-        if aqi > 150:
-            return "#ff3232", "<div class='alert-danger'>⚠️ HAZARDOUS</div>"
+        if aqi > 300:
+            return "#7e0023", "<div style='padding: 15px; border-radius: 5px; background: rgba(126, 0, 35, 0.2); border-left: 5px solid #7e0023; color: white; font-weight: bold;'>⚠️ HAZARDOUS</div>"
+        elif aqi > 200:
+            return "#8f3f97", "<div style='padding: 15px; border-radius: 5px; background: rgba(143, 63, 151, 0.2); border-left: 5px solid #8f3f97; color: white; font-weight: bold;'>⚠️ VERY UNHEALTHY</div>"
+        elif aqi > 150:
+            return "#ff0000", "<div style='padding: 15px; border-radius: 5px; background: rgba(255, 0, 0, 0.2); border-left: 5px solid #ff0000; color: white; font-weight: bold;'>⚠️ UNHEALTHY</div>"
         elif aqi > 100:
-            return "#ffa500", "<div class='alert-warning'>🚧 WARNING</div>"
+            return "#ff7e00", "<div style='padding: 15px; border-radius: 5px; background: rgba(255, 126, 0, 0.2); border-left: 5px solid #ff7e00; color: white; font-weight: bold;'>🚧 SENSITIVE GROUPS</div>"
+        elif aqi > 50:
+            return "#ffff00", "<div style='padding: 15px; border-radius: 5px; background: rgba(255, 255, 0, 0.2); border-left: 5px solid #ffff00; color: white; font-weight: bold;'>🟡 MODERATE</div>"
         else:
-            return "#00E676", "<div class='alert-success'>✅ GOOD</div>"
+            return "#00e400", "<div style='padding: 15px; border-radius: 5px; background: rgba(0, 228, 0, 0.2); border-left: 5px solid #00e400; color: white; font-weight: bold;'>✅ GOOD</div>"
 
+    color_curr, alert_curr = get_aqi_status(current_aqi)
     color_24h, alert_24h = get_aqi_status(pred_aqi_24h)
     color_48h, alert_48h = get_aqi_status(pred_aqi_48h)
     color_72h, alert_72h = get_aqi_status(pred_aqi_72h)
 
-    st.markdown("<h3 style='text-align: center; color: white; margin-bottom: 5px;'>3-Day Air Quality Forecast</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: white; margin-bottom: 5px;'>Live Dashboard & 3-Day Forecast</h3>", unsafe_allow_html=True)
     st.markdown(f"<p style='text-align: center; color: #b0bec5; font-size: 0.9rem; margin-bottom: 20px;'>Data last updated: {last_updated}</p>", unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns(3)
+    col0, col1, col2, col3 = st.columns(4)
     
+    with col0:
+        st.markdown(f"""
+        <div class='metric-card' style='text-align: center; margin-bottom: 20px; border: 1px solid #00e400;'>
+            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>Current AQI</div>
+            <div style='font-size: 3.5rem; font-weight: 800; color: {color_curr}; margin-bottom: 15px;'>{current_aqi:.0f}</div>
+            {alert_curr}
+        </div>
+        """, unsafe_allow_html=True)
+
     with col1:
         st.markdown(f"""
         <div class='metric-card' style='text-align: center; margin-bottom: 20px;'>
-            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>Day 1: Tomorrow (24h)</div>
+            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>Tomorrow (24h)</div>
             <div style='font-size: 3.5rem; font-weight: 800; color: {color_24h}; margin-bottom: 15px;'>{pred_aqi_24h:.0f}</div>
             {alert_24h}
         </div>
@@ -191,7 +208,7 @@ if data:
     with col2:
         st.markdown(f"""
         <div class='metric-card' style='text-align: center; margin-bottom: 20px;'>
-            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>Day 2: Day After (48h)</div>
+            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>Day After (48h)</div>
             <div style='font-size: 3.5rem; font-weight: 800; color: {color_48h}; margin-bottom: 15px;'>{pred_aqi_48h:.0f}</div>
             {alert_48h}
         </div>
@@ -200,7 +217,7 @@ if data:
     with col3:
         st.markdown(f"""
         <div class='metric-card' style='text-align: center; margin-bottom: 20px;'>
-            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>Day 3: Three Days (72h)</div>
+            <div style='font-size: 1.1rem; color: #b0bec5; font-weight: 600; margin-bottom: 10px;'>3 Days (72h)</div>
             <div style='font-size: 3.5rem; font-weight: 800; color: {color_72h}; margin-bottom: 15px;'>{pred_aqi_72h:.0f}</div>
             {alert_72h}
         </div>

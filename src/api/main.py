@@ -67,14 +67,19 @@ def predict_aqi():
         
     try:
         # Get latest features
-        feature_view = fs.get_feature_view("aqi_features_view", version=2)
-        # Fetch the last row
-        # In Hopsworks, getting a single feature vector:
-        # We can use get_feature_vector(entry) if we know the primary key, but since we want the latest:
-        # We can fetch the batch data and get the latest
-        batch_data = feature_view.get_batch_data()
-        batch_data.sort_values(by="timestamp", ascending=False, inplace=True)
-        latest_features = batch_data.head(1).drop(['date', 'timestamp', 'target_aqi_24h', 'target_aqi_48h', 'target_aqi_72h'], axis=1, errors='ignore')
+        # To get the absolute latest data dynamically, we query the offline feature group directly 
+        # instead of reading the static materialized dataset from the Feature View.
+        df = fs.sql("SELECT * FROM aqi_features_1 ORDER BY timestamp DESC LIMIT 1")
+        
+        # Ensure we only pass the exactly expected 18 features in the correct order
+        model_features = [
+            'temperature', 'humidity', 'precipitation', 'pressure', 
+            'wind_speed', 'wind_direction', 'pm10', 'pm2_5', 
+            'carbon_monoxide', 'nitrogen_dioxide', 'sulphur_dioxide', 
+            'ozone', 'aqi', 'hour', 'day_of_week', 'month', 
+            'aqi_24h_rolling_mean', 'aqi_change_rate'
+        ]
+        latest_features = df[model_features]
         
         # Align column order with the training features expected by the model
         if hasattr(model, "feature_names_in_"):
@@ -115,10 +120,11 @@ def predict_aqi():
             print(f"Error generating SHAP explanation: {shap_err}")
         
         return {
+            "current_aqi": float(features_dict.get('aqi', 0.0)),
             "predicted_aqi_24h": pred_24h,
             "predicted_aqi_48h": pred_48h,
             "predicted_aqi_72h": pred_72h,
-            "latest_timestamp": float(batch_data.iloc[0]['timestamp']),
+            "latest_timestamp": float(df.iloc[0]['timestamp']),
             "features_used": latest_features.to_dict(orient="records")[0],
             "shap_explanation": shap_contrib
         }
