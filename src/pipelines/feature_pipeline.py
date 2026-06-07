@@ -101,9 +101,10 @@ def run_feature_pipeline():
     # In live serving, we don't know the future targets (that's what we predict).
     # But for historical feature insertion, we want to maintain the same schema.
     # We insert NaN for targets in the online feature store.
-    df['target_aqi_24h'] = float('nan')
-    df['target_aqi_48h'] = float('nan')
-    df['target_aqi_72h'] = float('nan')
+    import numpy as np
+    df['target_aqi_24h'] = pd.Series(np.nan, index=df.index, dtype='float32')
+    df['target_aqi_48h'] = pd.Series(np.nan, index=df.index, dtype='float32')
+    df['target_aqi_72h'] = pd.Series(np.nan, index=df.index, dtype='float32')
     
     df.dropna(subset=['aqi_change_rate'], inplace=True)
     
