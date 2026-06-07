@@ -69,7 +69,15 @@ def predict_aqi():
         # Get latest features
         # To get the absolute latest data dynamically, we query the offline feature group directly 
         # instead of reading the static materialized dataset from the Feature View.
-        df = fs.sql("SELECT * FROM aqi_features_1 ORDER BY timestamp DESC LIMIT 1")
+        fg = fs.get_feature_group("aqi_features", version=1)
+        
+        # We filter the database to only send us the last 48 hours of data (rather than all 30,000 rows)
+        from datetime import datetime, timedelta
+        two_days_ago = int((datetime.now() - timedelta(days=2)).timestamp() * 1000)
+        
+        # Read the filtered data via Feature Query Service
+        df = fg.filter(fg.timestamp >= two_days_ago).read()
+        df.sort_values(by="timestamp", ascending=False, inplace=True)
         
         # Ensure we only pass the exactly expected 18 features in the correct order
         model_features = [
