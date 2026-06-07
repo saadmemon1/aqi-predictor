@@ -76,15 +76,19 @@ def run_training_pipeline():
             'alpha': [0.1, 1.0, 10.0, 100.0]
         },
         "Random Forest": {
-            'n_estimators': [100, 200, 300],
+            'n_estimators': [100, 200, 300, 400],
             'max_depth': [None, 10, 20, 30],
             'min_samples_split': [2, 5, 10]
         },
         "XGBoost": {
-            'n_estimators': [100, 200, 300],
+            'n_estimators': [100, 200, 300, 400],
             'max_depth': [3, 5, 7, 9],
-            'learning_rate': [0.01, 0.05, 0.1],
-            'subsample': [0.8, 1.0]
+            'learning_rate': [0.01, 0.05, 0.1, 0.2],
+            'subsample': [0.7, 0.8, 1.0],
+            'colsample_bytree': [0.6, 0.8, 1.0],
+            'min_child_weight': [1, 3, 5],
+            'reg_alpha': [0.0, 0.1, 1.0],
+            'reg_lambda': [0.1, 1.0, 10.0]
         }
     }
 
@@ -95,10 +99,18 @@ def run_training_pipeline():
 
     for name, base_model in models.items():
         print(f"\n--- Tuning and Training {name} ---")
+        
+        # Calculate total available parameter combinations to adjust n_iter safely
+        n_configs = 1
+        for vals in param_grids[name].values():
+            n_configs *= len(vals)
+        curr_n_iter = min(25, n_configs)
+        print(f"Running search with {curr_n_iter} iterations (out of {n_configs} combinations)...")
+        
         search = RandomizedSearchCV(
             base_model,
             param_grids[name],
-            n_iter=10,
+            n_iter=curr_n_iter,
             cv=3,
             scoring='r2',
             random_state=42,
