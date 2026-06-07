@@ -20,29 +20,54 @@ warnings.filterwarnings('ignore')
 def fix_xgboost_base_score(model):
     """
     XGBoost 3.0+ multi-output models serialize 'base_score' as a list or list-string.
-    This monkey-patches the booster's save_config method to intercept and fix the serialization
-    so SHAP TreeExplainer doesn't crash when it calls save_config().
+    This monkey-patches SHAP's internal UBJSON and JSON decoders to intercept the parsed model configuration
+    and fix the base_score string so SHAP TreeExplainer doesn't crash on float() conversion.
     """
-    import json
+    import shap.explainers._tree as shap_tree
+    
+    # Patch UBJSON decoder (used in newer SHAP versions with XGBoost)
     try:
-        booster = model.get_booster()
-        original_save_config = booster.save_config
+        import shap.explainers.other._ubjson as ubj
+        original_decode = ubj.decode_ubjson_buffer
+        if not hasattr(original_decode, "_patched"):
+            def patched_decode(*args, **kwargs):
+                jmodel = original_decode(*args, **kwargs)
+                if isinstance(jmodel, dict):
+                    base_score = jmodel.get("learner", {}).get("learner_model_param", {}).get("base_score")
+                    if base_score is not None:
+                        if isinstance(base_score, str) and base_score.startswith("["):
+                            inner = base_score.strip("[]").split(",")[0]
+                            jmodel["learner"]["learner_model_param"]["base_score"] = inner
+                        elif isinstance(base_score, list) and len(base_score) > 0:
+                            jmodel["learner"]["learner_model_param"]["base_score"] = str(base_score[0])
+                return jmodel
+            patched_decode._patched = True
+            ubj.decode_ubjson_buffer = patched_decode
+    except Exception:
+        pass
+
+    # Patch json.loads in shap.explainers._tree (used in some SHAP versions)
+    try:
+        original_loads = shap_tree.json.loads
+        if not hasattr(original_loads, "_patched"):
+            def patched_loads(*args, **kwargs):
+                jmodel = original_loads(*args, **kwargs)
+                if isinstance(jmodel, dict):
+                    base_score = jmodel.get("learner", {}).get("learner_model_param", {}).get("base_score")
+                    if base_score is not None:
+                        if isinstance(base_score, str) and base_score.startswith("["):
+                            inner = base_score.strip("[]").split(",")[0]
+                            jmodel["learner"]["learner_model_param"]["base_score"] = inner
+                        elif isinstance(base_score, list) and len(base_score) > 0:
+                            jmodel["learner"]["learner_model_param"]["base_score"] = str(base_score[0])
+                return jmodel
+            patched_loads._patched = True
+            shap_tree.json.loads = patched_loads
+    except Exception:
+        pass
         
-        def patched_save_config(*args, **kwargs):
-            config = json.loads(original_save_config(*args, **kwargs))
-            base_score = config.get("learner", {}).get("learner_model_param", {}).get("base_score")
-            if base_score is not None:
-                if isinstance(base_score, str) and base_score.startswith("["):
-                    inner = base_score.strip("[]").split(",")[0]
-                    config["learner"]["learner_model_param"]["base_score"] = inner
-                elif isinstance(base_score, list) and len(base_score) > 0:
-                    config["learner"]["learner_model_param"]["base_score"] = str(base_score[0])
-            return json.dumps(config)
-            
-        booster.save_config = patched_save_config
-        print("Successfully monkey-patched XGBoost save_config to fix base_score.")
-    except Exception as e:
-        print(f"Warning: Could not patch XGBoost base_score: {e}")
+        
+    print("Successfully monkey-patched SHAP JSON/UBJSON decoders to handle XGBoost base_score.")
 
 
 def run_training_pipeline():
