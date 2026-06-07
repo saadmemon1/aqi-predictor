@@ -113,22 +113,22 @@ def run_training_pipeline():
 
     param_grids = {
         "Ridge Regression": {
-            'alpha': [0.1, 1.0, 10.0, 100.0]
+            'alpha': [1.0, 10.0]
         },
         "Random Forest": {
-            'n_estimators': [100, 200, 300, 400],
-            'max_depth': [None, 10, 20, 30],
-            'min_samples_split': [2, 5, 10]
+            'n_estimators': [100, 200],
+            'max_depth': [None, 10],
+            'min_samples_split': [2]
         },
         "XGBoost": {
-            'n_estimators': [100, 200, 300, 400],
-            'max_depth': [3, 5, 7, 9],
-            'learning_rate': [0.01, 0.05, 0.1, 0.2],
-            'subsample': [0.7, 0.8, 1.0],
-            'colsample_bytree': [0.6, 0.8, 1.0],
-            'min_child_weight': [1, 3, 5],
-            'reg_alpha': [0.0, 0.1, 1.0],
-            'reg_lambda': [0.1, 1.0, 10.0]
+            'n_estimators': [100, 200],
+            'max_depth': [5, 7],
+            'learning_rate': [0.1],
+            'subsample': [0.8],
+            'colsample_bytree': [0.8],
+            'min_child_weight': [3],
+            'reg_alpha': [0.0],
+            'reg_lambda': [1.0]
         }
     }
 
