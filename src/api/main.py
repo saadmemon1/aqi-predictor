@@ -50,14 +50,7 @@ def startup_load_model():
     # Attempt to load model on startup in the background or synchronously
     load_model(retries=3, delay=5)
 
-@app.post("/run-feature-pipeline")
-def api_run_feature_pipeline():
-    """Triggered hourly by cron-job.org"""
-    success = run_feature_pipeline()
-    if success:
-        return {"status": "success", "message": "Feature pipeline executed successfully"}
-    else:
-        raise HTTPException(status_code=500, detail="Feature pipeline failed")
+
 
 @app.get("/predict")
 def predict_aqi():
