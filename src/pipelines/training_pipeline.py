@@ -20,33 +20,27 @@ warnings.filterwarnings('ignore')
 def fix_xgboost_base_score(model):
     """
     XGBoost 3.0+ multi-output models serialize 'base_score' as a list or list-string.
-    This fixes it to a single float representation in the config so SHAP TreeExplainer doesn't crash.
+    This monkey-patches the booster's save_config method to intercept and fix the serialization
+    so SHAP TreeExplainer doesn't crash when it calls save_config().
     """
     import json
     try:
         booster = model.get_booster()
-        config = json.loads(booster.save_config())
+        original_save_config = booster.save_config
         
-        def fix_dict(d):
-            if not isinstance(d, dict):
-                return
-            for k, v in d.items():
-                if k == "base_score":
-                    if isinstance(v, list) and len(v) > 0:
-                        d[k] = str(float(v[0]))
-                    elif isinstance(v, str) and v.startswith("["):
-                        inner = v.strip("[]").split(",")[0]
-                        d[k] = str(float(inner))
-                elif isinstance(v, dict):
-                    fix_dict(v)
-                elif isinstance(v, list):
-                    for item in v:
-                        if isinstance(item, dict):
-                            fix_dict(item)
-                            
-        fix_dict(config)
-        booster.load_config(json.dumps(config))
-        print("Successfully patched XGBoost base_score inside booster configuration.")
+        def patched_save_config(*args, **kwargs):
+            config = json.loads(original_save_config(*args, **kwargs))
+            base_score = config.get("learner", {}).get("learner_model_param", {}).get("base_score")
+            if base_score is not None:
+                if isinstance(base_score, str) and base_score.startswith("["):
+                    inner = base_score.strip("[]").split(",")[0]
+                    config["learner"]["learner_model_param"]["base_score"] = inner
+                elif isinstance(base_score, list) and len(base_score) > 0:
+                    config["learner"]["learner_model_param"]["base_score"] = str(base_score[0])
+            return json.dumps(config)
+            
+        booster.save_config = patched_save_config
+        print("Successfully monkey-patched XGBoost save_config to fix base_score.")
     except Exception as e:
         print(f"Warning: Could not patch XGBoost base_score: {e}")
 
