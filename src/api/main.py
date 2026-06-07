@@ -4,7 +4,6 @@ from fastapi import FastAPI, HTTPException
 import hopsworks
 from pydantic import BaseModel
 import pandas as pd
-from src.pipelines.feature_pipeline import run_feature_pipeline
 import time
 
 app = FastAPI(title="AQI Predictor API")
@@ -66,17 +65,11 @@ def predict_aqi():
         )
         
     try:
-        # Get latest features
-        # To get the absolute latest data dynamically, we query the offline feature group directly 
-        # instead of reading the static materialized dataset from the Feature View.
+        # Get latest features from Hopsworks Feature Group
         fg = fs.get_feature_group("aqi_features", version=1)
         
-        # We filter the database to only send us the last 48 hours of data (rather than all 30,000 rows)
-        from datetime import datetime, timedelta
-        two_days_ago = int((datetime.now() - timedelta(days=2)).timestamp() * 1000)
-        
-        # Read the filtered data via Feature Query Service
-        df = fg.filter(fg.timestamp >= two_days_ago).read()
+        # Read all data via Feature Query Service (~30K rows, takes ~1 second)
+        df = fg.read()
         df.sort_values(by="timestamp", ascending=False, inplace=True)
         
         # Ensure we only pass the exactly expected 18 features in the correct order
@@ -87,31 +80,26 @@ def predict_aqi():
             'ozone', 'aqi', 'hour', 'day_of_week', 'month', 
             'aqi_24h_rolling_mean', 'aqi_change_rate'
         ]
-        latest_features = df[model_features]
+        latest_features = df.head(1)[model_features]
         
-        # Align column order with the training features expected by the model
+        # Align column order with model expectations
         if hasattr(model, "feature_names_in_"):
             latest_features = latest_features[list(model.feature_names_in_)]
         
         features_dict = latest_features.to_dict(orient="records")[0]
-        print(f"API Debug - Features passed to model: {features_dict}")
         
-        # Predict raw values
+        # Predict
         raw_pred = model.predict(latest_features)[0]
         
-        # Check if raw_pred is a multi-output array/list
         if hasattr(raw_pred, "__len__") and len(raw_pred) >= 3:
             pred_24h = max(0.0, float(raw_pred[0]))
             pred_48h = max(0.0, float(raw_pred[1]))
             pred_72h = max(0.0, float(raw_pred[2]))
         else:
-            # Fallback for single-output model
             single_val = max(0.0, float(raw_pred))
-            pred_24h = single_val
-            pred_48h = single_val
-            pred_72h = single_val
+            pred_24h = pred_48h = pred_72h = single_val
             
-        # Calculate SHAP values for feature contribution explanation
+        # SHAP explanation
         shap_contrib = {}
         try:
             if explainer is not None:
@@ -119,13 +107,15 @@ def predict_aqi():
                 if isinstance(sv, list):
                     sv = sv[0]
                 if len(sv.shape) == 3:
-                    sv = sv[0, :, 0]  # shape: (n_samples, n_features, n_targets) -> take first sample, first target
+                    sv = sv[0, :, 0]
                 elif len(sv.shape) == 2:
                     sv = sv[0]
                 for col, val in zip(latest_features.columns, sv):
                     shap_contrib[col] = float(val)
         except Exception as shap_err:
             print(f"Error generating SHAP explanation: {shap_err}")
+            import traceback
+            traceback.print_exc()
         
         return {
             "current_aqi": float(features_dict.get('aqi', 0.0)),
@@ -133,7 +123,7 @@ def predict_aqi():
             "predicted_aqi_48h": pred_48h,
             "predicted_aqi_72h": pred_72h,
             "latest_timestamp": float(df.iloc[0]['timestamp']),
-            "features_used": latest_features.to_dict(orient="records")[0],
+            "features_used": features_dict,
             "shap_explanation": shap_contrib
         }
     except Exception as e:

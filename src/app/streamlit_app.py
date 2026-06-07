@@ -183,7 +183,12 @@ if data:
     color_72h, alert_72h = get_aqi_status(pred_aqi_72h)
 
     st.markdown("<h3 style='text-align: center; color: white; margin-bottom: 5px;'>Live Dashboard & 3-Day Forecast</h3>", unsafe_allow_html=True)
-    st.markdown(f"<p style='text-align: center; color: #b0bec5; font-size: 0.9rem; margin-bottom: 20px;'>Data last updated: {last_updated}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: center; color: #b0bec5; font-size: 0.9rem; margin-bottom: 20px;'>Data last updated: {last_updated} (UTC)</p>", unsafe_allow_html=True)
+    
+    # Show staleness warning if data is older than 24 hours
+    data_age_hours = (datetime.utcnow() - datetime.utcfromtimestamp(data['latest_timestamp'] / 1000.0)).total_seconds() / 3600
+    if data_age_hours > 24:
+        st.warning(f"⚠️ Feature Store data is {data_age_hours:.0f} hours old. The Hopsworks offline materialization job may be queued. New data will appear once the job completes.")
     
     col0, col1, col2, col3 = st.columns(4)
     
