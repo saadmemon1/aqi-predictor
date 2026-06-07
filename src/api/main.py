@@ -118,12 +118,24 @@ def predict_aqi():
             import traceback
             traceback.print_exc()
         
+        # Attempt to get the precise time the pipeline actually ran (Hopsworks commit time)
+        pipeline_run_time = None
+        try:
+            commits = fg.commit_details(limit=1)
+            if commits:
+                # Hopsworks commit_id is inherently the Unix epoch timestamp in milliseconds
+                commit_id = list(commits.keys())[0]
+                pipeline_run_time = float(commit_id)
+        except Exception as e:
+            print("Could not fetch commit details:", e)
+            
         return {
             "current_aqi": float(features_dict.get('aqi', 0.0)),
             "predicted_aqi_24h": pred_24h,
             "predicted_aqi_48h": pred_48h,
             "predicted_aqi_72h": pred_72h,
             "latest_timestamp": float(df.iloc[0]['timestamp']),
+            "pipeline_run_time": pipeline_run_time,
             "features_used": features_dict,
             "shap_explanation": shap_contrib
         }

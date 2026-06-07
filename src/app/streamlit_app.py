@@ -129,7 +129,17 @@ if data:
     pred_aqi_48h = max(0.0, data.get('predicted_aqi_48h', 0.0))
     pred_aqi_72h = max(0.0, data.get('predicted_aqi_72h', 0.0))
     features = data['features_used']
-    last_updated = datetime.fromtimestamp(data['latest_timestamp'] / 1000.0).strftime('%Y-%m-%d %H:%M')
+    
+    # Try to use the precise pipeline run time from Hopsworks commits if available
+    if data.get('pipeline_run_time'):
+        utc_dt = datetime.utcfromtimestamp(data['pipeline_run_time'] / 1000.0)
+    else:
+        # Fallback: the timestamp of the latest weather forecast point
+        utc_dt = datetime.utcfromtimestamp(data['latest_timestamp'] / 1000.0)
+        
+    # Convert timestamp to PKT (UTC+5)
+    pkt_dt = utc_dt + pd.Timedelta(hours=5)
+    last_updated = pkt_dt.strftime('%Y-%m-%d %H:%M')
     
     # US EPA AQI Categories
     def get_aqi_status(aqi):
@@ -152,7 +162,7 @@ if data:
     color_72h, alert_72h = get_aqi_status(pred_aqi_72h)
 
     st.markdown("<h3 style='text-align: center; color: white; margin-bottom: 5px;'>Live Dashboard & 3-Day Forecast</h3>", unsafe_allow_html=True)
-    st.markdown(f"<p style='text-align: center; color: #b0bec5; font-size: 0.9rem; margin-bottom: 20px;'>Data last updated: {last_updated} (UTC)</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: center; color: #b0bec5; font-size: 0.9rem; margin-bottom: 20px;'>Data last updated: {last_updated} (PKT)</p>", unsafe_allow_html=True)
     
     # Show staleness warning if data is older than 24 hours
     data_age_hours = (datetime.utcnow() - datetime.utcfromtimestamp(data['latest_timestamp'] / 1000.0)).total_seconds() / 3600
